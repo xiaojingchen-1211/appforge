@@ -8,11 +8,20 @@ interface Db {
 }
 
 export async function createFileStore(): Promise<Store> {
-  const dir =
+  const preferredDir =
     process.env.DATA_DIR ||
     (process.env.VERCEL ? "/tmp/appforge-data" : path.join(process.cwd(), "data"));
+  // 部分平台（如 Sealos）挂载的持久卷可能没有写权限，自动降级到 /tmp
+  let dir = preferredDir;
+  try {
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(path.join(dir, ".write-test"), "ok");
+    await fs.unlink(path.join(dir, ".write-test"));
+  } catch {
+    dir = "/tmp/appforge-data";
+    await fs.mkdir(dir, { recursive: true });
+  }
   const file = path.join(dir, "store.json");
-  await fs.mkdir(dir, { recursive: true });
 
   // 串行化写操作，避免并发请求把 JSON 写坏
   let queue: Promise<unknown> = Promise.resolve();
