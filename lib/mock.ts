@@ -4,7 +4,69 @@ const ACCENTS: Record<string, string> = {
   warm: "#c2410c",
 };
 
-function shell(title: string, accent: string, body: string): string {
+/**
+ * 不同跑道产出不同布局，让"赛马模式"在无 Key 时也能看出差异。
+ * focus：极简专注（窄栏、大留白、弱边框）
+ * dense：专业高密度（宽栏、紧凑栅格、统计条）
+ * warm：活泼暖色（圆角卡片、柔和阴影、高饱和强调）
+ */
+function variantCss(variantKey: string, accent: string): string {
+  switch (variantKey) {
+    case "dense":
+      return `:root{--bg:#eef1f5;--panel:#fff;--ink:#0f172a;--muted:#475569;--line:#cbd5e1;--accent:${accent};--danger:#b91c1c}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--ink);padding:12px;line-height:1.4;font-size:13px}
+.wrap{max-width:1280px;margin:0 auto}
+h1{font-size:16px;margin:0 0 2px;letter-spacing:.2px}
+.sub{color:var(--muted);font-size:11px;margin:0 0 10px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 12px;margin-bottom:8px}
+label{display:block;font-size:11px;color:var(--muted);margin-bottom:2px;text-transform:uppercase;letter-spacing:.3px}
+input,select,textarea{width:100%;font:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--line);border-radius:4px;background:#fff;color:inherit}
+button{font:inherit;font-size:12px;padding:5px 12px;border-radius:4px;border:1px solid var(--line);background:#f8fafc;cursor:pointer;font-weight:500}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button:hover{filter:brightness(.95)}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px}
+.err{color:var(--danger);font-size:11px;margin-top:6px;display:none}
+.empty{color:var(--muted);font-size:12px;padding:10px;text-align:center}
+@media(max-width:720px){body{padding:8px}}`;
+    case "warm":
+      return `:root{--bg:#fdf6f0;--panel:#fff;--ink:#1b1d22;--muted:#7c6f64;--line:#f0e6dc;--accent:${accent};--danger:#b91c1c}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--ink);padding:20px;line-height:1.6}
+.wrap{max-width:900px;margin:0 auto}
+h1{font-size:22px;margin:0 0 4px;font-weight:700}
+.sub{color:var(--muted);font-size:13px;margin:0 0 16px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:18px;margin-bottom:14px;box-shadow:0 4px 14px rgba(194,65,12,.06)}
+label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:500}
+input,select,textarea{width:100%;font:inherit;font-size:14px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:#fffdfa;color:inherit}
+button{font:inherit;font-size:14px;padding:10px 18px;border-radius:12px;border:1px solid var(--line);background:#fff;cursor:pointer;font-weight:600}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button:hover{filter:brightness(.95);transform:translateY(-1px)}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px}
+.err{color:var(--danger);font-size:12px;margin-top:8px;display:none}
+.empty{color:var(--muted);font-size:13px;padding:16px;text-align:center}
+@media(max-width:720px){body{padding:14px}}`;
+    default: // focus
+      return `:root{--bg:#fafafa;--panel:#fff;--ink:#1b1d22;--muted:#9ca3af;--line:#f0f0f0;--accent:${accent};--danger:#b91c1c}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--ink);padding:32px;line-height:1.6}
+.wrap{max-width:720px;margin:0 auto}
+h1{font-size:24px;margin:0 0 4px;font-weight:600}
+.sub{color:var(--muted);font-size:13px;margin:0 0 24px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:20px;margin-bottom:16px}
+label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+input,select,textarea{width:100%;font:inherit;font-size:14px;padding:10px;border:1px solid var(--line);border-radius:6px;background:#fff;color:inherit}
+button{font:inherit;font-size:14px;padding:10px 16px;border-radius:6px;border:1px solid var(--line);background:#fff;cursor:pointer}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button:hover{filter:brightness(.96)}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px}
+.err{color:var(--danger);font-size:12px;margin-top:8px;display:none}
+.empty{color:var(--muted);font-size:13px;padding:16px;text-align:center}
+@media(max-width:720px){body{padding:20px}}`;
+  }
+}
+
+function shell(title: string, accent: string, body: string, variantKey = "focus"): string {
   return `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -12,22 +74,7 @@ function shell(title: string, accent: string, body: string): string {
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>${title}</title>
 <style>
-:root{--bg:#f5f6f8;--panel:#fff;--ink:#1b1d22;--muted:#6b7280;--line:#e5e7eb;--accent:${accent};--danger:#b91c1c}
-*{box-sizing:border-box}
-body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--ink);padding:20px;line-height:1.5}
-.wrap{max-width:1060px;margin:0 auto}
-h1{font-size:20px;margin:0 0 4px}
-.sub{color:var(--muted);font-size:13px;margin:0 0 16px}
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px}
-label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
-input,select,textarea{width:100%;font:inherit;font-size:14px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;color:inherit}
-button{font:inherit;font-size:14px;padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer}
-button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
-button:hover{filter:brightness(.96)}
-.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
-.err{color:var(--danger);font-size:12px;margin-top:8px;display:none}
-.empty{color:var(--muted);font-size:13px;padding:16px;text-align:center}
-@media(max-width:720px){body{padding:12px}}
+${variantCss(variantKey, accent)}
 </style>
 </head>
 <body>
@@ -38,7 +85,7 @@ ${body}
 </html>`;
 }
 
-function kanban(accent: string, prompt: string): string {
+function kanban(accent: string, prompt: string, variantKey: string): string {
   const title = prompt.slice(0, 30) || "任务看板";
   return shell(
     "任务看板",
@@ -128,10 +175,11 @@ function kanban(accent: string, prompt: string): string {
   render();
 })();
 </script>`,
+    variantKey,
   );
 }
 
-function loanCalculator(accent: string, prompt: string): string {
+function loanCalculator(accent: string, prompt: string, variantKey: string): string {
   const title = prompt.slice(0, 30) || "房贷计算器";
   return shell(
     "房贷计算器",
@@ -227,10 +275,11 @@ function loanCalculator(accent: string, prompt: string): string {
   if(state.records.length)renderResult(state.records[0]);
 })();
 </script>`,
+    variantKey,
   );
 }
 
-function profile(accent: string, prompt: string): string {
+function profile(accent: string, prompt: string, variantKey: string): string {
   const title = prompt.slice(0, 30) || "个人主页生成器";
   return shell(
     "个人主页生成器",
@@ -311,22 +360,24 @@ function profile(accent: string, prompt: string): string {
   if(state.profiles.length)renderProfile(state.profiles[0]);
 })();
 </script>`,
+    variantKey,
   );
 }
 
 /**
  * 离线 mock 生成器：根据关键词选出可用的小应用模板。
  * 无 API Key、额度耗尽或模型超时时启用，保证演示流程不中断。
+ * 不同 variantKey 产出不同布局（极简/紧凑/活泼），让赛马模式在无 Key 时也能看出差异。
  */
 export function mockGenerate(prompt: string, variantKey: string): string {
   const accent = ACCENTS[variantKey] || ACCENTS.focus;
   const text = prompt.toLowerCase();
 
   if (/房贷|贷款|月供|利率|计算器|calculator|loan/.test(text)) {
-    return loanCalculator(accent, prompt);
+    return loanCalculator(accent, prompt, variantKey);
   }
   if (/主页|简历|个人|profile|resume|portfolio/.test(text)) {
-    return profile(accent, prompt);
+    return profile(accent, prompt, variantKey);
   }
-  return kanban(accent, prompt);
+  return kanban(accent, prompt, variantKey);
 }
