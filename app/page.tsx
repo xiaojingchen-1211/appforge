@@ -38,13 +38,33 @@ export default function Workbench() {
   const [error, setError] = useState("");
   const [codeView, setCodeView] = useState<Candidate | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [nickname, setNickname] = useState<string | null>(null);
+  const [nickInput, setNickInput] = useState("");
 
   useEffect(() => {
+    const saved = localStorage.getItem("appforge_nickname");
+    if (saved) setNickname(saved);
+  }, []);
+
+  useEffect(() => {
+    if (!nickname) return;
     fetch("/api/projects")
       .then((r) => r.json())
       .then((d) => setProjects(Array.isArray(d.projects) ? d.projects : []))
       .catch(() => undefined);
-  }, []);
+  }, [nickname]);
+
+  function handleLogin() {
+    const nick = nickInput.trim();
+    if (!nick) return;
+    localStorage.setItem("appforge_nickname", nick);
+    setNickname(nick);
+  }
+
+  function handleLogout() {
+    localStorage.removeItem("appforge_nickname");
+    setNickname(null);
+  }
 
   async function generate() {
     const text = prompt.trim();
@@ -120,12 +140,49 @@ export default function Workbench() {
               <span className={`dot ${provider === "mock" ? "mock" : provider === "live" ? "live" : ""}`} />
               {provider === "live" ? "模型已连接" : provider === "mock" ? "离线演示模式" : "就绪"}
             </span>
+            {nickname && (
+              <span className="pill" style={{ cursor: "pointer" }} onClick={handleLogout} title="点击切换用户">
+                👤 {nickname}
+              </span>
+            )}
           </div>
         </div>
       </header>
 
       <main className="container">
-        {!hasResults && (
+        {!nickname && (
+          <section className="hero">
+            <div className="eyebrow">AI Native · 生成器</div>
+            <h1 className="title">
+              说一句话，
+              <br />
+              得到一个<span className="title-accent">能点、能存</span>的应用
+            </h1>
+            <p className="lead">
+              先起个昵称进入工作台——数据保存在本地，刷新不丢。
+            </p>
+            <div className="prompt-card" style={{ maxWidth: 420 }}>
+              <input
+                className="prompt-input"
+                style={{ fontSize: 15 }}
+                placeholder="输入你的昵称（例如：陈晓敬）"
+                value={nickInput}
+                onChange={(e) => setNickInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+                maxLength={20}
+                autoFocus
+              />
+              <div className="prompt-foot">
+                <div />
+                <button className="btn btn-primary" onClick={handleLogin} disabled={!nickInput.trim()}>
+                  进入工作台 →
+                </button>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {nickname && !hasResults && (
           <section className="hero">
             <div className="eyebrow">AI Native · 生成器</div>
             <h1 className="title">
@@ -277,6 +334,18 @@ export default function Workbench() {
                         </button>
                         <button className="btn" onClick={() => setCodeView(c)} type="button">
                           查看代码
+                        </button>
+                        <button
+                          className="btn"
+                          type="button"
+                          onClick={() => {
+                            const blob = new Blob([c.html], { type: "text/html;charset=utf-8" });
+                            const url = URL.createObjectURL(blob);
+                            const w = window.open(url, "_blank");
+                            if (!w) URL.revokeObjectURL(url);
+                          }}
+                        >
+                          新窗口运行
                         </button>
                       </div>
                     </div>

@@ -25,6 +25,10 @@ export default function ProjectDetail() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [editHtml, setEditHtml] = useState("");
+  const [editBusy, setEditBusy] = useState(false);
+  const [editError, setEditError] = useState("");
 
   useEffect(() => {
     if (!id) return;
@@ -83,6 +87,43 @@ export default function ProjectDetail() {
     if (!project || !confirm("确定删除这个项目？")) return;
     await fetch(`/api/projects/${project.id}`, { method: "DELETE" });
     router.push("/");
+  }
+
+  function openEditor() {
+    if (!selected) return;
+    setEditHtml(selected.html);
+    setEditing(true);
+    setEditError("");
+  }
+
+  async function saveEdit() {
+    if (!project || editBusy) return;
+    if (editHtml.trim().length < 100) {
+      setEditError("HTML 太短，请确认内容");
+      return;
+    }
+    setEditBusy(true);
+    setEditError("");
+    try {
+      const res = await fetch(`/api/projects/${project.id}/versions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          html: editHtml,
+          prompt: "手工编辑 HTML",
+          parentVersionId: selected?.id,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "保存失败");
+      setProject(data.project);
+      setEditing(false);
+      setNotice("手工编辑版本已保存 ✓");
+    } catch (e) {
+      setEditError(e instanceof Error ? e.message : "保存失败");
+    } finally {
+      setEditBusy(false);
+    }
   }
 
   if (notFound) {
@@ -210,6 +251,30 @@ export default function ProjectDetail() {
                 在新窗口运行
               </a>
               <button
+                className="btn"
+                type="button"
+                onClick={() => {
+                  const blob = new Blob([selected.html], { type: "text/html;charset=utf-8" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = `${project.title || "app"}.html`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                style={{ display: "block", width: "100%", marginTop: 8 }}
+              >
+                下载 HTML 文件
+              </button>
+              <button
+                className="btn"
+                type="button"
+                onClick={openEditor}
+                style={{ display: "block", width: "100%", marginTop: 8 }}
+              >
+                手工编辑 HTML
+              </button>
+              <button
                 className="btn btn-danger"
                 onClick={removeProject}
                 type="button"
@@ -220,6 +285,45 @@ export default function ProjectDetail() {
             </div>
           </aside>
         </div>
+
+        {editing && (
+          <div className="card" style={{ marginTop: 20 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <h3 style={{ margin: 0 }}>手工编辑 HTML</h3>
+              <span style={{ color: "var(--muted)", fontSize: 12 }}>保存后会生成一个新版本，旧版本不受影响</span>
+            </div>
+            <textarea
+              value={editHtml}
+              onChange={(e) => setEditHtml(e.target.value)}
+              spellCheck={false}
+              style={{
+                width: "100%",
+                minHeight: 300,
+                fontFamily: "Menlo, Monaco, monospace",
+                fontSize: 12,
+                padding: 12,
+                border: "1px solid var(--border)",
+                borderRadius: 8,
+                background: "#0e1117",
+                color: "#c9d1e0",
+                resize: "vertical",
+              }}
+            />
+            {editError && <div className="error">{editError}</div>}
+            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+              <button
+                className="btn btn-primary"
+                onClick={saveEdit}
+                disabled={editBusy}
+              >
+                {editBusy ? "保存中…" : "保存为新版本"}
+              </button>
+              <button className="btn btn-ghost" onClick={() => setEditing(false)} type="button">
+                取消
+              </button>
+            </div>
+          </div>
+        )}
       </main>
     </>
   );

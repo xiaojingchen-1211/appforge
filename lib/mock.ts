@@ -364,20 +364,301 @@ function profile(accent: string, prompt: string, variantKey: string): string {
   );
 }
 
+// ==================== 会议室预约 ====================
+function meetingRoom(accent: string, prompt: string, variantKey: string): string {
+  const title = prompt.slice(0, 30) || "会议室预约";
+  return shell(
+    "会议室预约",
+    accent,
+    `<h1>${title}</h1>
+<p class="sub">输入名称、日期、开始/结束时间；冲突时自动拒绝，支持取消预约。</p>
+<form class="panel row" id="form" style="align-items:end">
+  <div><label>会议名称</label><input id="mname" maxlength="40" placeholder="季度复盘" /></div>
+  <div><label>日期</label><input id="mdate" type="date" /></div>
+  <div><label>开始时间</label><input id="mstart" type="time" /></div>
+  <div><label>结束时间</label><input id="mend" type="time" /></div>
+  <div><label>会议室</label><select id="mroom"><option>A 厅</option><option>B 厅</option><option>C 厅</option></select></div>
+  <div><button class="primary" type="submit" style="width:100%">预约</button></div>
+</form>
+<div class="err" id="err">请检查输入：时间冲突或字段不完整。</div>
+<div class="panel">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+    <strong style="font-size:14px">今日预约 · <span id="todayLabel"></span></strong>
+    <button id="clearDay" type="button">清空今日</button>
+  </div>
+  <div id="list"><div class="empty">暂无预约</div></div>
+</div>
+<script>
+(function(){
+  var KEY='appforge_mock_meeting_v1';
+  var err=document.getElementById('err'),listEl=document.getElementById('list');
+  function load(){try{var raw=localStorage.getItem(KEY);var d=raw?JSON.parse(raw):null;if(d&&Array.isArray(d.items))return d;}catch(e){}return{items:[]};}
+  var state=load();
+  function save(){try{localStorage.setItem(KEY,JSON.stringify(state));}catch(e){}}
+  function fmt(n){return n<10?'0'+n:''+n;}
+  function timeToMin(t){var p=t.split(':');return parseInt(p[0])*60+parseInt(p[1]);}
+  function rangesOverlap(a1,a2,b1,b2){return a1<b2&&b1<a2;}
+  function uid(){return 'm'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
+  function render(){
+    var today=new Date().toISOString().slice(0,10);
+    document.getElementById('todayLabel').textContent=today;
+    var todays=state.items.filter(function(i){return i.date===today;}).sort(function(a,b){return timeToMin(a.start)-timeToMin(b.start);});
+    if(!todays.length){listEl.innerHTML='<div class="empty">今日暂无预约</div>';return;}
+    listEl.innerHTML='';
+    todays.forEach(function(it){
+      var row=document.createElement('div');
+      row.style.cssText='display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)';
+      row.innerHTML='<div><strong>'+it.name+'</strong><div style="color:var(--muted);font-size:12px">'+it.start+'-'+it.end+' · '+it.room+'</div></div>';
+      var del=document.createElement('button');del.type='button';del.textContent='取消';
+      del.addEventListener('click',function(){state.items=state.items.filter(function(x){return x.id!==it.id;});save();render();});
+      row.appendChild(del);listEl.appendChild(row);
+    });
+  }
+  document.getElementById('form').addEventListener('submit',function(ev){
+    ev.preventDefault();err.style.display='none';
+    var name=document.getElementById('mname').value.trim();
+    var date=document.getElementById('mdate').value;
+    var start=document.getElementById('mstart').value;
+    var end=document.getElementById('mend').value;
+    var room=document.getElementById('mroom').value;
+    if(!name||!date||!start||!end){err.textContent='请填写完整字段';err.style.display='block';return;}
+    var sm=timeToMin(start),em=timeToMin(end);
+    if(sm>=em){err.textContent='结束时间必须晚于开始时间';err.style.display='block';return;}
+    var conflict=state.items.some(function(it){return it.date===date&&it.room===room&&rangesOverlap(sm,em,timeToMin(it.start),timeToMin(it.end));});
+    if(conflict){err.textContent='该时间段此会议室已被预约，冲突拒绝';err.style.display='block';return;}
+    state.items.unshift({id:uid(),name:name,date:date,start:start,end:end,room:room,createdAt:Date.now()});
+    save();render();document.getElementById('mname').value='';
+  });
+  document.getElementById('clearDay').addEventListener('click',function(){
+    var today=new Date().toISOString().slice(0,10);
+    state.items=state.items.filter(function(i){return i.date!==today;});save();render();
+  });
+  render();
+})();
+</script>`,
+    variantKey,
+  );
+}
+
+// ==================== 倒计时 ====================
+function countdown(accent: string, prompt: string, variantKey: string): string {
+  const title = prompt.slice(0, 30) || "倒计时";
+  return shell(
+    "倒计时",
+    accent,
+    `<h1>${title}</h1>
+<p class="sub">设置目标日期时间，实时显示剩余天 / 时 / 分 / 秒。</p>
+<form class="panel row" id="form" style="align-items:end">
+  <div><label>目标名称</label><input id="cname" maxlength="30" placeholder="元旦 / 生日 / 考试" /></div>
+  <div><label>截止日期</label><input id="cdate" type="datetime-local" /></div>
+  <div><button class="primary" type="submit" style="width:100%">开始倒计时</button></div>
+</form>
+<div class="panel" id="display" style="text-align:center">
+  <div id="ctitle" style="font-size:18px;margin-bottom:10px">还没有设置目标</div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+    <div><div id="cdays" style="font-size:48px;font-weight:700;color:var(--accent)">-</div><div style="color:var(--muted);font-size:12px">天</div></div>
+    <div><div id="chours" style="font-size:48px;font-weight:700;color:var(--accent)">-</div><div style="color:var(--muted);font-size:12px">时</div></div>
+    <div><div id="cmins" style="font-size:48px;font-weight:700;color:var(--accent)">-</div><div style="color:var(--muted);font-size:12px">分</div></div>
+    <div><div id="csecs" style="font-size:48px;font-weight:700;color:var(--accent)">-</div><div style="color:var(--muted);font-size:12px">秒</div></div>
+  </div>
+</div>
+<div class="panel">
+  <strong style="font-size:14px">历史倒计时</strong>
+  <div id="clist" style="margin-top:8px"><div class="empty">暂无历史</div></div>
+</div>
+<script>
+(function(){
+  var KEY='appforge_mock_countdown_v1',timer=null,current=null;
+  function load(){try{var raw=localStorage.getItem(KEY);var d=raw?JSON.parse(raw):null;if(d&&Array.isArray(d.items))return d;}catch(e){}return{items:[]};}
+  var state=load();
+  function save(){try{localStorage.setItem(KEY,JSON.stringify(state));}catch(e){}}
+  function tick(){
+    if(!current)return;
+    var diff=new Date(current.target).getTime()-Date.now();
+    if(diff<=0){document.getElementById('ctitle').textContent=current.name+' · 时间到了！';['cdays','chours','cmins','csecs'].forEach(function(id){document.getElementById(id).textContent='0';});clearInterval(timer);return;}
+    var d=Math.floor(diff/86400000),h=Math.floor(diff%86400000/3600000),m=Math.floor(diff%3600000/60000),s=Math.floor(diff%60000/1000);
+    document.getElementById('ctitle').textContent='距离 '+current.name+' 还有';
+    document.getElementById('cdays').textContent=d;document.getElementById('chours').textContent=h;document.getElementById('cmins').textContent=m;document.getElementById('csecs').textContent=s;
+  }
+  function renderList(){
+    if(!state.items.length){document.getElementById('clist').innerHTML='<div class="empty">暂无历史</div>';return;}
+    var el=document.getElementById('clist');el.innerHTML='';
+    state.items.forEach(function(it,idx){
+      var row=document.createElement('div');row.style.cssText='display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px';
+      row.innerHTML='<span>'+it.name+' · '+new Date(it.target).toLocaleString('zh-CN')+'</span>';
+      var act=document.createElement('span');
+      var load=document.createElement('button');load.type='button';load.textContent='加载';load.style.cssText='margin-right:6px;padding:4px 10px;font-size:12px';
+      load.addEventListener('click',function(){current=it;tick();clearInterval(timer);timer=setInterval(tick,1000);});
+      var del=document.createElement('button');del.type='button';del.textContent='删除';del.style.cssText='padding:4px 10px;font-size:12px';
+      del.addEventListener('click',function(){state.items.splice(idx,1);save();renderList();});
+      act.appendChild(load);act.appendChild(del);row.appendChild(act);el.appendChild(row);
+    });
+  }
+  document.getElementById('form').addEventListener('submit',function(ev){
+    ev.preventDefault();
+    var name=document.getElementById('cname').value.trim()||'倒计时';
+    var target=document.getElementById('cdate').value;
+    if(!target)return;
+    current={name:name,target:new Date(target).toISOString()};
+    if(!state.items.some(function(i){return i.target===current.target&&i.name===current.name;})){
+      state.items.unshift(current);save();renderList();
+    }
+    tick();clearInterval(timer);timer=setInterval(tick,1000);
+  });
+  renderList();
+})();
+</script>`,
+    variantKey,
+  );
+}
+
+// ==================== BMI 计算器 ====================
+function bmiCalc(accent: string, prompt: string, variantKey: string): string {
+  const title = prompt.slice(0, 30) || "BMI 计算器";
+  return shell(
+    "BMI 计算器",
+    accent,
+    `<h1>${title}</h1>
+<p class="sub">输入身高体重，计算 BMI 指数并给出健康建议；历史记录自动保存。</p>
+<form class="panel row" id="form" style="align-items:end">
+  <div><label>身高（cm）</label><input id="bh" type="number" min="50" max="250" step="0.1" placeholder="170" /></div>
+  <div><label>体重（kg）</label><input id="bw" type="number" min="20" max="300" step="0.1" placeholder="65" /></div>
+  <div><button class="primary" type="submit" style="width:100%">计算</button></div>
+</form>
+<div class="panel" id="result">
+  <div class="empty">填写身高体重后点击计算</div>
+</div>
+<div class="panel">
+  <strong style="font-size:14px">历史记录</strong>
+  <div id="blist" style="margin-top:8px"><div class="empty">暂无记录</div></div>
+</div>
+<script>
+(function(){
+  var KEY='appforge_mock_bmi_v1';
+  function load(){try{var raw=localStorage.getItem(KEY);var d=raw?JSON.parse(raw):null;if(d&&Array.isArray(d.items))return d;}catch(e){}return{items:[]};}
+  var state=load();
+  function save(){try{localStorage.setItem(KEY,JSON.stringify(state));}catch(e){}}
+  function classify(b){return b<18.5?'偏瘦':b<24?'正常':b<28?'偏胖':'肥胖';}
+  document.getElementById('form').addEventListener('submit',function(ev){
+    ev.preventDefault();
+    var h=parseFloat(document.getElementById('bh').value),w=parseFloat(document.getElementById('bw').value);
+    if(!(h>0)||!(w>0))return;
+    var bmi=w/Math.pow(h/100,2);bmi=Math.round(bmi*10)/10;
+    var cls=classify(bmi);
+    var res=document.getElementById('result');
+    var color=cls==='正常'?'var(--accent)':'#b45309';
+    res.innerHTML='<div style="text-align:center;padding:10px"><div style="font-size:14px;color:var(--muted)">你的 BMI</div><div style="font-size:48px;font-weight:700;color:'+color+'">'+bmi+'</div><div style="font-size:16px;color:'+color+'">'+cls+'</div></div>';
+    state.items.unshift({id:'b'+Date.now().toString(36),h:h,w:w,bmi:bmi,cls:cls,ts:Date.now()});
+    state.items=state.items.slice(0,20);save();render();
+  });
+  function render(){
+    if(!state.items.length){document.getElementById('blist').innerHTML='<div class="empty">暂无记录</div>';return;}
+    var el=document.getElementById('blist');el.innerHTML='';
+    state.items.forEach(function(it,idx){
+      var row=document.createElement('div');row.style.cssText='display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px';
+      row.innerHTML='<span>'+it.h+'cm · '+it.w+'kg · BMI '+it.bmi+' · <strong>'+it.cls+'</strong></span>';
+      var del=document.createElement('button');del.type='button';del.textContent='×';del.style.cssText='border:0;background:transparent;color:var(--muted);cursor:pointer';
+      del.addEventListener('click',function(){state.items.splice(idx,1);save();render();});
+      row.appendChild(del);el.appendChild(row);
+    });
+  }
+  render();
+})();
+</script>`,
+    variantKey,
+  );
+}
+
+// ==================== 通用兜底生成器 ====================
+function genericApp(accent: string, prompt: string, variantKey: string): string {
+  const title = prompt.slice(0, 30) || "自定义应用";
+  return shell(
+    "自定义应用",
+    accent,
+    `<h1>${title}</h1>
+<p class="sub">快速创建一个带输入、提交、历史记录和 localStorage 持久化的小应用骨架。</p>
+<form class="panel row" id="form" style="align-items:end">
+  <div><label>项目</label><input id="gitem" maxlength="40" placeholder="例如：番茄钟、打卡、记账" /></div>
+  <div><label>数值 / 标签</label><input id="gval" maxlength="40" placeholder="可选" /></div>
+  <div><button class="primary" type="submit" style="width:100%">添加</button></div>
+</form>
+<div class="panel">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+    <strong style="font-size:14px">记录列表</strong>
+    <button id="gclear" type="button">清空</button>
+  </div>
+  <div id="glist"><div class="empty">还没有记录</div></div>
+</div>
+<script>
+(function(){
+  var KEY='appforge_mock_generic_v1';
+  function load(){try{var raw=localStorage.getItem(KEY);var d=raw?JSON.parse(raw):null;if(d&&Array.isArray(d.items))return d;}catch(e){}return{items:[]};}
+  var state=load();
+  function save(){try{localStorage.setItem(KEY,JSON.stringify(state));}catch(e){}}
+  function render(){
+    if(!state.items.length){document.getElementById('glist').innerHTML='<div class="empty">还没有记录</div>';return;}
+    var el=document.getElementById('glist');el.innerHTML='';
+    state.items.forEach(function(it,idx){
+      var row=document.createElement('div');row.style.cssText='display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px';
+      row.innerHTML='<span><strong>'+it.item+'</strong>'+(it.val?' · '+it.val:'')+'</span><small style="color:var(--muted);font-size:11px">'+new Date(it.ts).toLocaleTimeString()+'</small>';
+      var del=document.createElement('button');del.type='button';del.textContent='×';del.style.cssText='border:0;background:transparent;color:var(--muted);cursor:pointer';
+      del.addEventListener('click',function(){state.items.splice(idx,1);save();render();});
+      row.appendChild(del);el.appendChild(row);
+    });
+  }
+  document.getElementById('form').addEventListener('submit',function(ev){
+    ev.preventDefault();
+    var item=document.getElementById('gitem').value.trim();
+    var val=document.getElementById('gval').value.trim();
+    if(!item)return;
+    state.items.unshift({id:'g'+Date.now().toString(36)+Math.random().toString(36).slice(2,4),item:item,val:val,ts:Date.now()});
+    state.items=state.items.slice(0,50);save();render();document.getElementById('gitem').value='';document.getElementById('gval').value='';
+  });
+  document.getElementById('gclear').addEventListener('click',function(){if(confirm('确定清空所有记录？')){state.items=[];save();render();}});
+  render();
+})();
+</script>`,
+    variantKey,
+  );
+}
+
 /**
  * 离线 mock 生成器：根据关键词选出可用的小应用模板。
- * 无 API Key、额度耗尽或模型超时时启用，保证演示流程不中断。
+ * 现在覆盖 7 类模板 + 通用兜底，大多数常见需求都能匹配到对应应用。
  * 不同 variantKey 产出不同布局（极简/紧凑/活泼），让赛马模式在无 Key 时也能看出差异。
  */
 export function mockGenerate(prompt: string, variantKey: string): string {
   const accent = ACCENTS[variantKey] || ACCENTS.focus;
   const text = prompt.toLowerCase();
 
-  if (/房贷|贷款|月供|利率|计算器|calculator|loan/.test(text)) {
-    return loanCalculator(accent, prompt, variantKey);
+  // BMI / 健康（放最前面，因为后面有通用"计算器"匹配）
+  if (/(bmi|体质|身体质量)/.test(text) && /(计算|身高|体重|健康)/.test(text)) {
+    return bmiCalc(accent, prompt, variantKey);
   }
-  if (/主页|简历|个人|profile|resume|portfolio/.test(text)) {
+  // 会议室预约
+  if (/(会议|预约|会议室|预定|booking|meeting|reserve)/.test(text)) {
+    return meetingRoom(accent, prompt, variantKey);
+  }
+  // 倒计时 / 计时相关
+  if (/(倒计时|timer|countdown|番茄|专注|计时器|stopwatch|钟)/.test(text)) {
+    return countdown(accent, prompt, variantKey);
+  }
+  // 主页 / 简历
+  if (/(主页|简历|个人|profile|resume|portfolio)/.test(text)) {
     return profile(accent, prompt, variantKey);
   }
-  return kanban(accent, prompt, variantKey);
+  // 看板 / 待办 / 任务
+  if (/(看板|待办|任务|todo|kanban|项目管理|list)/.test(text)) {
+    return kanban(accent, prompt, variantKey);
+  }
+  // 房贷 / 贷款 / 通用计算器（放后面，避免覆盖更具体的匹配）
+  if (/(房贷|贷款|月供|利率|calculator|loan)/.test(text)) {
+    return loanCalculator(accent, prompt, variantKey);
+  }
+  if (/计算器|计算|公式/.test(text)) {
+    // 通用"计算器"但没匹配到 BMI / 房贷 → 默认房贷计算器
+    return loanCalculator(accent, prompt, variantKey);
+  }
+  // 通用兜底：任何没匹配到的需求都生成一个可用的小应用骨架
+  return genericApp(accent, prompt, variantKey);
 }
